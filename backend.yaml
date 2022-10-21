@@ -1,0 +1,159 @@
+# Default values for gkh-service.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+hostname: &common_hostname HELM_INGRESS_HOST
+
+replicaCount: 1
+
+image:
+  registry: DOCKER_REGISTRY_ADDRESS
+  name: DOCKER_REGISTRY_IMAGE
+  username: DOCKER_REGISTRY_USERNAME
+  password: DOCKER_REGISTRY_PASSWORD
+  email: DOCKER_REGISTRY_EMAIL
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  annotations:
+    nginx.ingress.kubernetes.io/client-max-body-size: "200m"
+  hosts:
+    - host: *common_hostname
+      paths:
+        - path: /api
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Configuration for secrets that should be created
+secrets: {}
+
+# -------------------------------------------------------------- #
+# -------------------------------------------------------------- #
+
+postgresql:
+  username: HELM_POSTGRESQL_USERNAME
+  password: HELM_POSTGRESQL_PASSWORD
+  database: HELM_POSTGRESQL_DATABASE
+  host: HELM_POSTGRESQL_HOST
+  port: HELM_POSTGRESQL_PORT
+
+springProfilesActive: HELM_SPRING_PROFILES_ACTIVE
+
+keycloak:
+  username: HELM_KEYCLOAK_USER
+  password: HELM_KEYCLOAK_PASSWORD
+  host: HELM_KEYCLOAK_HOST
+  port: HELM_KEYCLOAK_PORT
+  proto: HELM_KEYCLOAK_PROTO
+  external:
+    host: HELM_KEYCLOAK_EXTERNAL_HOST
+    port: HELM_KEYCLOAK_EXTERNAL_PORT
+    proto: HELM_KEYCLOAK_EXTERNAL_PROTO
+
+elasticsearch:
+  host: HELM_ELASTICSEARCH_HOST
+  port: HELM_ELASTICSEARCH_PORT
+  proto: HELM_ELASTICSEARCH_PROTO
+
+minio:
+  host: HELM_MINIO_HOST
+  port: HELM_MINIO_PORT
+  proto: HELM_MINIO_PROTO
+  accessKey: HELM_MINIO_ACCESSKEY
+  secretKey: HELM_MINIO_SECRETKEY
+  fileUrlPrefix: HELM_MINIO_FILEURLPREFIX
+
+kibana:
+  host: HELM_KIBANA_HOST
+  port: HELM_KIBANA_PORT
+  proto: HELM_KIBANA_PROTO
+
+logstash:
+  host: HELM_LOGSTASH_HOST
+  port: HELM_LOGSTASH_PORT
+
+# -------------------------------------------------------------- #
+
+pgchecker:
+  image:
+    # Docker image used to check Postgresql readiness at startup
+    repository: docker.io/busybox
+    # Image tag for the pgchecker image
+    tag: 1.32
+    # Image pull policy for the pgchecker image
+    pullPolicy: IfNotPresent
+  # SecurityContext for the pgchecker container
+  securityContext:
+    allowPrivilegeEscalation: false
+    runAsUser: 1000
+    runAsGroup: 1000
+    runAsNonRoot: true
+  # Resource requests and limits for the pgchecker container
+  resources:
+    requests:
+      cpu: "10m"
+      memory: "16Mi"
+    limits:
+      cpu: "10m"
+      memory: "16Mi"
+
+# -------------------------------------------------------------- #
