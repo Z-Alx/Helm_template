@@ -1,0 +1,205 @@
+postgresql-ha:
+  clusterDomain: HELM_CLUSTER_DOMAIN
+  postgresql:
+    username: HELM_POSTGRESQL_USERNAME
+    password: HELM_POSTGRESQL_PASSWORD
+    database: HELM_POSTGRESQL_DATABASE
+    postgresPassword: HELM_POSTGRESQL_PASSWORD
+    repmgrUsername: HELM_POSTGRESQL_REPMGR_USERNAME
+    repmgrPassword: HELM_POSTGRESQL_REPMGR_PASSWORD
+    repmgrDatabase: HELM_POSTGRESQL_REPMGR_DATABASE
+    maxConnections: 1000
+    replicaCount: 3
+    podAntiAffinityPreset: "hard"
+    startupProbe:
+      enabled: true
+      initialDelaySeconds: 30
+    resources:
+      requests:
+        cpu: 500m
+        memory: 256Mi
+    pdb:
+      minAvailable: 1
+    initdbScripts:
+      gkh-service-sheme.sql: |
+        CREATE SCHEMA IF NOT EXISTS "gkh-service";
+      gkh-service-diff-sheme.sql: |
+        CREATE SCHEMA IF NOT EXISTS "gkh-service-diff";
+      keycloak-sheme.sql: |
+        CREATE SCHEMA IF NOT EXISTS "keycloak";
+  persistence:
+    storageClass: local-path
+#    size: 10Gi
+  pgpool:
+    adminUsername: HELM_PGPOOL_USERNAME
+    adminPassword: HELM_PGPOOL_PASSWORD
+    srCheckDatabase: HELM_POSTGRESQL_DATABASE
+    replicaCount: 2
+    podAntiAffinityPreset: "hard"
+    startupProbe:
+      enabled: true
+      initialDelaySeconds: 15
+    resources:
+      requests:
+        cpu: 500m
+        memory: 256Mi
+    pdb:
+      minAvailable: 1
+
+# -------------------------------------------------------------- #
+
+keycloak:
+  extraStartupArgs: "-Dkeycloak.frontendUrl=HELM_KEYCLOAK_EXTERNAL_PROTO://HELM_INGRESS_HOST/auth -Dkeycloak.profile.feature.upload_scripts=enabled -Dkeycloak.migration.action=import -Dkeycloak.migration.provider=singleFile -Dkeycloak.migration.file=/realm/realm.json -Dkeycloak.migration.strategy=IGNORE_EXISTING"
+  image:
+    debug: false
+  clusterDomain: HELM_CLUSTER_DOMAIN
+  replicaCount: 3
+  cache:
+    ownersCount: 3
+    authOwnersCount: 3
+  auth:
+    adminUser: HELM_KEYCLOAK_USER
+    adminPassword: "HELM_KEYCLOAK_PASSWORD"
+    managementUser: manager
+    managementPassword: "HELM_KEYCLOAK_PASSWORD"
+  proxyAddressForwarding: true
+  externalDatabase:
+    host: HELM_RELEASE-postgresql-ha-pgpool
+    user: HELM_POSTGRESQL_USERNAME
+    password: "HELM_POSTGRESQL_PASSWORD"
+    database: HELM_POSTGRESQL_DATABASE
+  extraEnvVars: |
+    - name: KEYCLOAK_DATABASE_SCHEMA
+      value: keycloak
+  extraVolumes: |
+    - name: realm-secret
+      secret:
+        secretName: {{ include "secretRealm" . }}
+    - name: theme
+      emptyDir: {}
+  extraVolumeMounts: |
+    - name: realm-secret
+      mountPath: "/realm/"
+      readOnly: true
+    - name: theme
+      mountPath: /opt/bitnami/keycloak/themes/MKA-GKH
+  initContainers: |
+    - name: theme-provider
+      image: istimage/theme-custom-keykloak:1.01
+      imagePullPolicy: IfNotPresent
+      command:
+        - sh
+      args:
+        - -c
+        - |
+          echo "Copying theme..."
+          cp -R /MKA-GKH/* /theme
+      volumeMounts:
+        - name: theme
+          mountPath: /theme
+  serviceDiscovery:
+    enabled: true
+    properties:
+      - port_range=>0
+      - dump_requests=>true
+      - namespace=>"HELM_NAMESPACE"
+      - labels=>"app.kubernetes.io/instance=HELM_RELEASE,app.kubernetes.io/component=keycloak,app.kubernetes.io/name=keycloak"
+  rbac:
+    create: true
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - pods
+        verbs:
+          - get
+          - list
+  podAntiAffinityPreset: "hard"
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    hostname: HELM_INGRESS_HOST
+    path: /auth
+    tls: false
+  postgresql:
+    enabled: false
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1024Mi
+  pdb:
+    minAvailable: 1
+
+# -------------------------------------------------------------- #
+
+minio:
+  clusterDomain: HELM_CLUSTER_DOMAIN
+  mode: distributed
+  fileUrlPrefix: HELM_MINIO_FILEURLPREFIX
+  accessKey:
+    password: HELM_MINIO_ACCESSKEY
+  secretKey:
+    password: HELM_MINIO_SECRETKEY
+  service:
+    port: 9090
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  pdb:
+    minAvailable: 1
+#  persistence:
+#    size: 10Gi
+
+# -------------------------------------------------------------- #
+
+elasticsearch:
+  clusterDomain: HELM_CLUSTER_DOMAIN
+  name: "HELM_RELEASE-elasticsearch"
+  master:
+    replicas: 3
+    podAntiAffinityPreset: "hard"
+#    persistence:
+#      size: 8Gi
+  coordinating:
+    replicas: 3
+    podAntiAffinityPreset: "hard"
+    pdb:
+      minAvailable: 1
+  data:
+    replicas: 3
+    podAntiAffinityPreset: "hard"
+#    persistence:
+#      size: 8Gi
+
+# -------------------------------------------------------------- #
+
+#kibana:
+#  replicaCount: 1
+#  podAntiAffinityPreset: soft
+#  service:
+#    port: 5601
+#  resources:
+#    requests:
+#      cpu: 250m
+#      memory: 256Mi
+#  persistence:
+#    size: 4Gi
+
+# -------------------------------------------------------------- #
+
+#logstash:
+#  clusterDomain: HELM_CLUSTER_DOMAIN
+#  replicaCount: 1
+#  podAntiAffinityPreset: soft
+#  resources:
+#    requests:
+#      cpu: 100m
+#      memory: 128Mi
+#  service:
+#    ports:
+#      http:
+#        port: 5046
+#  persistence:
+#    size: 1Gi
